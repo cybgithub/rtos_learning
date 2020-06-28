@@ -1,0 +1,5 @@
+project/Listings/*
+project/Objects/*
+*.uvguix.*
+
+!*.sct
