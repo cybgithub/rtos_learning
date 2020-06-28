@@ -17,7 +17,7 @@ typedef portSTACK_TYPE StackType_t;
 typedef long BaseType_t;
 typedef unsigned long UBaseType_t;
 
-#if (configUse_16_BIT_TICKS == 1)
+#if (configUSE_16_BIT_TICKS == 1)
     typedef uint16_t TickType_t;
     #define portMAX_DELAY (TickType_t)0xffff;
 #else
@@ -43,6 +43,77 @@ typedef unsigned long UBaseType_t;
 	__dsb( portSY_FULL_READ_WRITE );											\
 	__isb( portSY_FULL_READ_WRITE );											\
 }
+
+/* 临界区管理 */
+
+/*  
+ * not interrupt-safe
+ * 未保存 BASEPRI 值，不关心当前中都安装该，不能在中断中使用，也不能嵌套使用
+ */
+extern void vPortEnterCritical(void);
+extern void vPortExitCritical(void);
+
+#define portDISABLE_INTERRUPTS()    vPortRaiseBASEPRI() // 屏蔽部分中断
+#define portENABLE_INTERRUPTS()     vPortSetBASEPRI(0)  // 不关闭任何中断
+
+#define portENTER_CRITICAL()        vPortEnterCritical()
+#define portEXIT_CRITICAL()         vPortExitCritical()
+
+/*  
+ * interrupt-safe
+ * 保存 BASEPRI 值，更新完 BASEPRI 新值后，将之前保存好的 BASEPRI 的值返回，能在中断中使用，也能嵌套使用
+ */
+#define portSET_INTERRUPT_MASK_FROM_ISR()    ulPortRaiseBASEPRI() // 进入临界区--屏蔽部分中断，并返回之前的中断状态
+#define portCLEAR_INTERRUPT_MASK_FROM_ISR(x) vPortSetBASEPRI(x)   // 退出临界区--开启被关闭的中断，并恢复之前的中断状态
+
+#define portINLINE __inline
+
+#ifndef portFORCE_INLINE
+#define portFORCE_INLINE __forceinline
+#endif
+
+static portFORCE_INLINE void vPortSetBASEPRI(uint32_t ulBASEPRI)
+{
+    __asm
+    {
+        /* Barrier instructions are not used as this function is only used to
+		lower the BASEPRI value. */
+        msr basepri, ulBASEPRI
+    }
+}
+
+
+static portFORCE_INLINE void vPortRaiseBASEPRI(void)
+{
+    uint32_t ulNewBASEPRI = configMAX_SYSCALL_INTERRUPT_PRIORITY; // >= 11的中断会被屏蔽，不会被响应， < 11的中断会被响应
+    __asm
+    {
+		/* Set BASEPRI to the max syscall priority to effect a critical
+		section. */
+        msr basepri, ulNewBASEPRI
+        dsb
+        isb
+    }
+}
+
+static portFORCE_INLINE uint32_t ulPortRaiseBASEPRI(void)
+{
+    uint32_t ulReturn, ulNewBASEPRI = configMAX_SYSCALL_INTERRUPT_PRIORITY;
+    
+    __asm
+    {
+        /* Save current BASEPRI and Set BASEPRI to the max syscall priority to effect a critical section */
+        mrs ulReturn, basepri
+        msr basepri, ulNewBASEPRI
+        dsb
+        isb
+    }
+    
+    /* return previous BASEPRI */
+    return ulReturn;
+}
+
+
 
 
 #endif /* __PORTMACRO_H__ */

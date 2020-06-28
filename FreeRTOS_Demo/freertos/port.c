@@ -2,6 +2,8 @@
 #include "task.h"
 #include "ARMCM4.h"
 
+static UBaseType_t uxCriticalNesting = 0xaaaaaaaa;
+
 /*
 *************************************************************************
 *                              宏定义
@@ -95,11 +97,11 @@ __asm void prvStartFirstTask( void )
 	/* 设置主堆栈指针msp的值 */
 	msr msp, r0
     
-	/* 使能全局中断 */
+	/* 使能全局中断和异常 */
 	cpsie i
 	cpsie f
-	dsb
-	isb
+	dsb /* 数据同步屏障，确保在下一条指令开始执行前，所有的存储器访问已经完成 */
+	isb /* 指令同步屏障，清除流水线并且确保在新指令执行时，之前的指令都已经执行完毕 */
 	
     /* 调用SVC去启动第一个任务 */
 	svc 0  
@@ -136,6 +138,7 @@ __asm void vPortSVCHandler( void )
 
 __asm void xPortPendSVHandler( void )
 {
+    //extern uxCriticalNesting;
 	extern pxCurrentTCB;
 	extern vTaskSwitchContext;
 
@@ -178,3 +181,40 @@ __asm void xPortPendSVHandler( void )
                                    当新任务的运行地址被出栈到PC寄存器后，新的任务也会被执行。*/
 	nop
 }
+
+/*
+*************************************************************************
+*                             临界段相关函数
+*************************************************************************
+*/
+
+void vPortEnterCritical(void)
+{
+    portDISABLE_INTERRUPTS();
+    uxCriticalNesting++;
+    
+    /* This is not the interrupt safe version of the enter critical function so
+	assert() if it is being called from an interrupt context.  Only API
+	functions that end in "FromISR" can be used in an interrupt.  Only assert if
+	the critical nesting count is 1 to protect against recursive calls if the
+	assert function also uses a critical section. */
+    if(uxCriticalNesting == 1)
+    {
+        //configASSERT( ( portNVIC_INT_CTRL_REG & portVECTACTIVE_MASK ) == 0 );
+    }
+}
+
+void vPortExitCritical(void)
+{
+    //configASSERT(uxCriticalNesting);
+    uxCriticalNesting--;
+    
+    if(uxCriticalNesting == 0)
+    {
+        portENABLE_INTERRUPTS();
+    }
+}
+
+
+
+

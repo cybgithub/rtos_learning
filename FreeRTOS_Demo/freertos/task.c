@@ -37,7 +37,7 @@ static void prvInitialiseNewTask(TaskFunction_t pxTaskCode,          /* 任务入口
 *                               静态任务创建函数
 *************************************************************************
 */
-#if(configSUPPORT_STATIC_ALLOCTION == 1)
+#if(configSUPPORT_STATIC_ALLOCATION == 1)
 TaskHandle_t xTaskCreateStatic(TaskFunction_t pxTaskCode,          /* 任务入口 */
                                const char *const pcName,           /* 任务名称，字符串形式 */
                                const uint32_t ulStackDepth,        /* 任务栈大小，相应的栈指针移动 4 * ulStackDepth 个字节 */
