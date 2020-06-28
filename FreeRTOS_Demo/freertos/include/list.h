@@ -66,17 +66,18 @@ typedef struct xLIST
 #define listCURRENT_LIST_LENGTH(pxList)               ((pxList)->uxNumberOfItems)
 
 /* 获取下一个节点的Onwer，即 TCB */
-#define listGET_OWNER_OF_NEXT_ENTRY(pxTCB, pxList)                           \
-{                                                                            \
-    List_t * const pxConstList = (pxList);                                   \
-	/* Increment the index to the next item and return the item, */          \
-    /* ensuring we don't return the marker used at the end of the list */    \							                                         \
-    pxConstList->pxIndex = pxConstList->pxIndex->pxNext;                     \
-    if((void *)(pxConstList->pxIndex) == (void *)( &(pConstList->xListEnd))) \
-    {                                                                        \
-        pxConstList->pxIndex = pxConstList->pxIndex->pxNext;                 \
-    }                                                                        \
-    pxTCB = pxConstList->pxIndex->pvOwner;                                   \
+#define listGET_OWNER_OF_NEXT_ENTRY(pxTCB, pxList)                                \
+{                                                                                 \
+    List_t * const pxConstList = (pxList);                                        \
+	/* Increment the index to the next item and return the item, */               \
+    /* ensuring we don't return the marker used at the end of the list */         \
+    (pxConstList)->pxIndex = (pxConstList)->pxIndex->pxNext;                      \
+    if((void *)(pxConstList)->pxIndex == (void *)&((pxConstList)->xListEnd))      \
+    {                                                                             \
+        (pxConstList)->pxIndex = (pxConstList)->pxIndex->pxNext;                  \
+    }                                                                             \
+    /* 获取节点的OWNER，即TCB */                                                  \
+    (pxTCB) = (pxConstList)->pxIndex->pvOwner;                                    \
 }
 
 #define listGET_OWNER_OF_HEAD_ENTRY(pxList)   ((&((pxList)->xListEnd))->pxNext->pvOwner)

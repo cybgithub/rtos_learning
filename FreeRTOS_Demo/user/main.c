@@ -79,17 +79,22 @@ void delay(uint32_t count)
  * 任务0， 空闲任务
  */
 static UBaseType_t idle_cnt = (UBaseType_t)0UL;
-static UBaseType_t print_rate = (UBaseType_t)0xfffff;
+static UBaseType_t print_rate = (UBaseType_t)0xffff;
 
 void Task0_Idle_Entry(void *p_arg)
 {
     while(1)
     {
+        #if 0
         idle_cnt++;
         if(idle_cnt % print_rate == 0)
         {
             printf("%s, exec for %u times agagin \n", __func__, print_rate);
+            idle_cnt = 0;
         }
+        #else
+        ;
+        #endif
     }
 }
 
@@ -150,13 +155,14 @@ int main(void)
 	/* 将硬件相关的初始化放在这里，如果是软件仿真则没有相关初始化代码 */
     
     /* 初始化与任务相关的列表，如就绪列表 */
-	prvInitialiseTaskLists();
+	//prvInitialiseTaskLists();
     
     /* 创建任务 */
     IdleTask_Handle = xTaskCreateStatic((TaskFunction_t)Task0_Idle_Entry,
                                      (char *)"IDLE",
                                      (uint32_t)configMINIMAL_STACK_SIZE,
                                      (void *)NULL,
+                                     taskIDLE_PRIORITY,
                                      (StackType_t *)IdleTask_Stack,
                                      (TCB_t *)(&IdleTask_TCB));
 
@@ -164,6 +170,7 @@ int main(void)
                                      (char *)"Task1",
                                      (uint32_t)TASK1_STACK_SIZE,
                                      (void *)NULL,
+                                     1,
                                      (StackType_t *)Task1_Stack,
                                      (TCB_t *)(&Task1_TCB));
                                      
@@ -171,13 +178,15 @@ int main(void)
                                      (char *)"Task2",
                                      (uint32_t)TASK2_STACK_SIZE,
                                      (void *)NULL,
+                                     2,
                                      (StackType_t *)Task2_Stack,
                                      (TCB_t *)(&Task2_TCB));
+#if 0 // 根据优先级自动添加到就绪列表
     /* 将任务添加到就绪列表 */
     vListInsertEnd(&(pxReadyTaskLists[0]), &(((TCB_t *)(&IdleTask_TCB))->xStateListItem)); 
     vListInsertEnd(&(pxReadyTaskLists[1]), &(((TCB_t *)(&Task1_TCB))->xStateListItem));  
     vListInsertEnd(&(pxReadyTaskLists[2]), &(((TCB_t *)(&Task2_TCB))->xStateListItem));  
-
+#endif
     /* 启动调度器，开始多任务调度，启动完成不返回 */                                     
     vTaskStartScheduler();
          
