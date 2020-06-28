@@ -13,6 +13,7 @@ TCB_t * volatile pxCurrentTCB = NULL;
 List_t pxReadyTaskLists[configMAX_PRIORITIES];
 
 static volatile UBaseType_t uxCurrentNumberOfTasks = (UBaseType_t)0U;
+static volatile TickType_t xTickCount = (TickType_t)0U;
 
 /*
 *************************************************************************
@@ -129,6 +130,7 @@ void prvInitialiseTaskLists(void)
 }
 
 /* 启动任务调度 */
+extern TCB_t IdleTask_TCB;
 extern TCB_t Task1_TCB;
 extern TCB_t Task2_TCB;
 
@@ -137,6 +139,9 @@ void vTaskStartScheduler(void)
     /* 手动指定第一个运行的任务 */
     pxCurrentTCB = &Task1_TCB;
     
+    /* 初始化系统时基计数器 */
+    xTickCount = (TickType_t)0U;
+
     /* 启动调度器 */
     if(xPortStartScheduler() != pdFALSE)
     {
@@ -147,6 +152,7 @@ void vTaskStartScheduler(void)
 /* 任务切换 */
 void vTaskSwitchContext(void)
 {
+#if 0
     /* 两个任务轮流切换 */
     if(pxCurrentTCB == &Task1_TCB)
     {
@@ -156,9 +162,104 @@ void vTaskSwitchContext(void)
     {
         pxCurrentTCB = &Task1_TCB;
     }
+#else
+    /* 如果当前线程是空闲线程，那么就去尝试执行线程1或线程2，
+     * 看看它们的延时时间是否结束，如果未到期，则继续运行空闲线程
+     */
+    if(pxCurrentTCB == &IdleTask_TCB)
+    {
+        if(Task1_TCB.xTicksToDelay == 0)
+        {
+            pxCurrentTCB = &Task1_TCB;
+        }
+        else if(Task2_TCB.xTicksToDelay == 0)
+        {
+            pxCurrentTCB = &Task2_TCB;
+        }
+        else
+        {
+            return ;
+        }
+    }
+    else
+    {
+        /* 同样的逻辑去检查线程1或线程2 */
+        if(pxCurrentTCB == &Task1_TCB)
+        {
+            if(Task2_TCB.xTicksToDelay == 0)
+            {
+                pxCurrentTCB = &Task2_TCB;
+            }
+            else if(pxCurrentTCB->xTicksToDelay != 0)
+            {
+                pxCurrentTCB = &IdleTask_TCB;
+            }
+            else
+            {
+                return ; /* 任务1和任务2都处于延时中 */
+            }
+        }
+        else if(pxCurrentTCB == &Task2_TCB)
+        {
+            if(Task1_TCB.xTicksToDelay == 0)
+            {
+                pxCurrentTCB = &Task1_TCB;
+            }
+            else if(pxCurrentTCB->xTicksToDelay != 0)
+            {
+                pxCurrentTCB = &IdleTask_TCB;
+            }
+            else
+            {
+                return ; /* 任务1和任务2都处于延时中 */
+            }
+        }
+        else
+        {
+            return ;
+        }
+    }
+#endif
 }
 
+/*
+ * 阻塞性延时，释放 CPU 使用权，CPU 可以去处理其他事情
+ */
+void vTaskDelay(const TickType_t xTicksToDelay)
+{
+    TCB_t *pxTCB = NULL;
 
+    /* 获取当前任务的 TCB */
+    pxTCB = pxCurrentTCB;
+
+    /* 设置延时时间 */
+    pxTCB->xTicksToDelay = xTicksToDelay;
+
+    /* 任务切换 */
+    taskYIELD();
+}
+
+void xTaskIncrementTick(void)
+{
+    TCB_t *pxTCB = NULL;
+    BaseType_t i = 0;
+
+    const TickType_t xConstTickCount = xTickCount + 1;
+    xTickCount = xConstTickCount;
+
+    /* 扫描就绪列表中所有线程的 xTickToDelay，如果不为0，则减1 */
+    for(i = 0; i < configMAX_PRIORITIES; i++)
+    {
+        pxTCB = (TCB_t *)listGET_OWNER_OF_HEAD_ENTRY((&pxReadyTaskLists[i]));
+        if(pxTCB->xTicksToDelay > 0)
+        {
+            pxTCB->xTicksToDelay--;
+        }
+    }
+
+    /* 任务切换 */
+    portYIELD();
+}
 
 
 

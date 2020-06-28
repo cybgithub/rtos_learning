@@ -96,6 +96,16 @@ static portFORCE_INLINE void vPortRaiseBASEPRI(void)
     }
 }
 
+static portFORCE_INLINE void vPortClearBASEPRIFromISR( void )
+{
+	__asm
+	{
+		/* Set BASEPRI to 0 so no interrupts are masked.  This function is only
+		used to lower the mask in an interrupt, so memory barriers are not used. */
+		msr basepri, #0
+	}
+}
+
 static portFORCE_INLINE uint32_t ulPortRaiseBASEPRI(void)
 {
     uint32_t ulReturn, ulNewBASEPRI = configMAX_SYSCALL_INTERRUPT_PRIORITY;

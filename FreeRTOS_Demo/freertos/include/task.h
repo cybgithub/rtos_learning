@@ -1,7 +1,7 @@
 #ifndef __TASK_H__
 #define __TASK_H__
 
-//#include "list.h"
+#include "list.h"
 
 #define taskYIELD()    portYIELD()
 
@@ -20,5 +20,7 @@ TaskHandle_t xTaskCreateStatic(TaskFunction_t pxTaskCode,
 void prvInitialiseTaskLists(void);
 void vTaskStartScheduler(void);
 void vTaskSwitchContext(void);
+void vTaskDelay(const TickType_t xTicksToDelay);
+void xTaskIncrementTick(void);
 
 #endif /* __TASK_H__ */

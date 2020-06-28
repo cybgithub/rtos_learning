@@ -380,16 +380,6 @@
       </TargetOption>
       <Groups>
         <Group>
-          <GroupName>user</GroupName>
-          <Files>
-            <File>
-              <FileName>main.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\user\main.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
           <GroupName>project</GroupName>
         </Group>
         <Group>
@@ -452,6 +442,16 @@
               <FileName>port.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\freertos\port.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>user</GroupName>
+          <Files>
+            <File>
+              <FileName>main.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\user\main.c</FilePath>
             </File>
           </Files>
         </Group>

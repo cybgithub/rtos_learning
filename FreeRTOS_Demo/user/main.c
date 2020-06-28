@@ -60,20 +60,47 @@ TaskHandle_t Task2_Handle;
 #define TASK2_STACK_SIZE                    20
 StackType_t Task2_Stack[TASK2_STACK_SIZE];
 
+/* 定义空闲任务栈 */
+TCB_t IdleTask_TCB;
+TaskHandle_t IdleTask_Handle;
+StackType_t IdleTask_Stack[configMINIMAL_STACK_SIZE];
+
+
 /*
- *软件延时
+ * 软件延时
+ * 让 CPU 空等来实现延时，并未放弃 CPU 占有权，即 CPU 还是被占用着
  */
 void delay(uint32_t count)
 {
     for (; count != 0; count--);
 }
+
 /*
- *任务 1
+ * 任务0， 空闲任务
+ */
+static UBaseType_t idle_cnt = (UBaseType_t)0UL;
+static UBaseType_t print_rate = (UBaseType_t)0xfffff;
+
+void Task0_Idle_Entry(void *p_arg)
+{
+    while(1)
+    {
+        idle_cnt++;
+        if(idle_cnt % print_rate == 0)
+        {
+            printf("%s, exec for %u times agagin \n", __func__, print_rate);
+        }
+    }
+}
+
+/*
+ * 任务 1
  */
 void Task1_Entry(void *p_arg)
 {
 	while(1)
 	{
+#if 0
         flag_1 = 1;
         delay(100);
         flag_1 = 0;
@@ -81,15 +108,23 @@ void Task1_Entry(void *p_arg)
         
         /* 任务切换（手动），触发 PendSV_Handler，进入 xPortPendSVHandler，内部执行了 vTaskSwitchContext */
         taskYIELD();
+#else
+        printf("exec %s \n", __func__);
+        flag_1 = 1;
+        vTaskDelay(20);
+        flag_1 = 0;
+        vTaskDelay(20);
+#endif
 	}
 }
 /*
- *任务 2
+ * 任务 2
  */
 void Task2_Entry(void *p_arg)
 {
 	while(1)
 	{
+#if 0
         flag_2 = 1;
         delay(100);
         flag_2 = 0;
@@ -97,6 +132,13 @@ void Task2_Entry(void *p_arg)
         
         /* 任务切换（手动），触发 PendSV_Handler，进入 xPortPendSVHandler，内部执行了 vTaskSwitchContext */
         taskYIELD();
+#else
+        printf("exec %s \n", __func__);
+        flag_2 = 1;
+        vTaskDelay(20);
+        flag_2 = 0;
+        vTaskDelay(20);
+#endif
 	}
 }
 /*
@@ -111,6 +153,13 @@ int main(void)
 	prvInitialiseTaskLists();
     
     /* 创建任务 */
+    IdleTask_Handle = xTaskCreateStatic((TaskFunction_t)Task0_Idle_Entry,
+                                     (char *)"IDLE",
+                                     (uint32_t)configMINIMAL_STACK_SIZE,
+                                     (void *)NULL,
+                                     (StackType_t *)IdleTask_Stack,
+                                     (TCB_t *)(&IdleTask_TCB));
+
     Task1_Handle = xTaskCreateStatic((TaskFunction_t)Task1_Entry,
                                      (char *)"Task1",
                                      (uint32_t)TASK1_STACK_SIZE,
@@ -125,6 +174,7 @@ int main(void)
                                      (StackType_t *)Task2_Stack,
                                      (TCB_t *)(&Task2_TCB));
     /* 将任务添加到就绪列表 */
+    vListInsertEnd(&(pxReadyTaskLists[0]), &(((TCB_t *)(&IdleTask_TCB))->xStateListItem)); 
     vListInsertEnd(&(pxReadyTaskLists[1]), &(((TCB_t *)(&Task1_TCB))->xStateListItem));  
     vListInsertEnd(&(pxReadyTaskLists[2]), &(((TCB_t *)(&Task2_TCB))->xStateListItem));  
 
