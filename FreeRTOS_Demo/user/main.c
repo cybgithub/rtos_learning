@@ -42,6 +42,7 @@ int fputc(int ch, FILE *f)
 */
 uint32_t flag_1 = 0;
 uint32_t flag_2 = 0;
+uint32_t flag_3 = 0;
 
 extern List_t pxReadyTaskLists[configMAX_PRIORITIES];
 
@@ -59,6 +60,11 @@ TCB_t Task2_TCB;
 TaskHandle_t Task2_Handle;
 #define TASK2_STACK_SIZE                    20
 StackType_t Task2_Stack[TASK2_STACK_SIZE];
+
+TCB_t Task3_TCB;
+TaskHandle_t Task3_Handle;
+#define TASK3_STACK_SIZE                    20
+StackType_t Task3_Stack[TASK3_STACK_SIZE];
 
 /* 定义空闲任务栈 */
 TCB_t IdleTask_TCB;
@@ -105,14 +111,14 @@ void Task1_Entry(void *p_arg)
 {
 	while(1)
 	{
-#if 0
+#if 1
         flag_1 = 1;
-        delay(100);
+        delay(50);
         flag_1 = 0;
-        delay(100);
+        delay(50);
         
         /* 任务切换（手动），触发 PendSV_Handler，进入 xPortPendSVHandler，内部执行了 vTaskSwitchContext */
-        taskYIELD();
+        //taskYIELD();
 #else
         printf("exec %s \n", __func__);
         flag_1 = 1;
@@ -129,20 +135,44 @@ void Task2_Entry(void *p_arg)
 {
 	while(1)
 	{
-#if 0
+#if 1
         flag_2 = 1;
         delay(100);
         flag_2 = 0;
         delay(100);		
         
         /* 任务切换（手动），触发 PendSV_Handler，进入 xPortPendSVHandler，内部执行了 vTaskSwitchContext */
-        taskYIELD();
+        //taskYIELD();
 #else
         printf("exec %s \n", __func__);
         flag_2 = 1;
         vTaskDelay(20);
         flag_2 = 0;
         vTaskDelay(20);
+#endif
+	}
+}
+/*
+ * 任务 3
+ */
+void Task3_Entry(void *p_arg)
+{
+	while(1)
+	{
+#if 0
+        flag_3 = 1;
+        delay(100);
+        flag_3 = 0;
+        delay(100);
+
+        /* 任务切换（手动），触发 PendSV_Handler，进入 xPortPendSVHandler，内部执行了 vTaskSwitchContext */
+        taskYIELD();
+#else
+        printf("exec %s \n", __func__);
+        flag_3 = 1;
+        vTaskDelay(1);
+        flag_3 = 0;
+        vTaskDelay(1);
 #endif
 	}
 }
@@ -173,14 +203,24 @@ int main(void)
                                      1,
                                      (StackType_t *)Task1_Stack,
                                      (TCB_t *)(&Task1_TCB));
-                                     
+
+    /* 优先级与 Task2 相同，测试时间片轮转 */
     Task2_Handle = xTaskCreateStatic((TaskFunction_t)Task2_Entry,
                                      (char *)"Task2",
                                      (uint32_t)TASK2_STACK_SIZE,
                                      (void *)NULL,
-                                     2,
+                                     1,
                                      (StackType_t *)Task2_Stack,
                                      (TCB_t *)(&Task2_TCB));
+
+    /* 任务1和2是死循环，任务3优先级必须高于任务1/2，才有机会运行 */
+    Task3_Handle = xTaskCreateStatic((TaskFunction_t)Task3_Entry,
+                                     (char *)"Task3",
+                                     (uint32_t)TASK3_STACK_SIZE,
+                                     (void *)NULL,
+                                     3,
+                                     (StackType_t *)Task3_Stack,
+                                     (TCB_t *)(&Task3_TCB));
 #if 0 // 根据优先级自动添加到就绪列表
     /* 将任务添加到就绪列表 */
     vListInsertEnd(&(pxReadyTaskLists[0]), &(((TCB_t *)(&IdleTask_TCB))->xStateListItem)); 

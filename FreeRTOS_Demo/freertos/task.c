@@ -104,7 +104,7 @@ static void prvResetNextTaskUnblockTime(void);
 	} /* taskSELECT_HIGHEST_PRIORITY_TASK() */
 
 	/*-----------------------------------------------------------*/
-#if 0
+#if 1
 	#define taskRESET_READY_PRIORITY( uxPriority )														\
 	{																									\
 		if( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ ( uxPriority ) ] ) ) == ( UBaseType_t ) 0 )	\
@@ -114,8 +114,8 @@ static void prvResetNextTaskUnblockTime(void);
 	}
 #else
     #define taskRESET_READY_PRIORITY( uxPriority )											            \
-    {																							        \
-            portRESET_READY_PRIORITY( ( uxPriority ), ( uxTopReadyPriority ) );					        \
+    {																							        \                                                                                            \
+        portRESET_READY_PRIORITY( ( uxPriority ), ( uxTopReadyPriority ) );					            \
     }
 #endif
 
@@ -415,7 +415,8 @@ void vTaskDelay(const TickType_t xTicksToDelay)
     taskYIELD();
 }
 
-void xTaskIncrementTick(void)
+//void xTaskIncrementTick(void)
+BaseType_t xTaskIncrementTick(void)
 {
 #if 0
     TCB_t *pxTCB = NULL;
@@ -442,6 +443,7 @@ void xTaskIncrementTick(void)
 #else
     TCB_t * pxTCB;
     TickType_t xItemValue; //节点的辅助排序值
+    BaseType_t xSwitchRequired = pdFALSE;
 
     const TickType_t xConstTickCount = xTickCount + 1;
     xTickCount = xConstTickCount;
@@ -468,8 +470,9 @@ void xTaskIncrementTick(void)
                 pxTCB = (TCB_t *)listGET_OWNER_OF_HEAD_ENTRY(pxDelayedTaskList);
                 xItemValue = listGET_LIST_ITEM_VALUE(&(pxTCB->xStateListItem));
 
-                /* 列表中存在任务未到期（从头开始检查，因为 xItemValue 是升序排列的），
-                   更新 xNextTaskUnblockTime 为下一个要到期的任务延时tick数 */
+                /* 循坏检查 延时任务列表 中第一个Item的 xItemValue（从头开始检查，因为 xItemValue 是升序排列的），
+                   如果大于当前时钟 Ticks ，更新 xNextTaskUnblockTime 为下一个要到期的任务延时tick数
+                   反之从延时列表中移除，并加入就绪列表 */
                 if(xConstTickCount < xItemValue)
                 {
                     xNextTaskUnblockTime = xItemValue;
@@ -480,12 +483,33 @@ void xTaskIncrementTick(void)
                 uxListRemove(&(pxTCB->xStateListItem));
                 /* 将解除等待的任务添加到就绪列表 */
                 prvAddTaskToReadyList(pxTCB);
+
+#if(configUSE_PREEMPTION == 1)
+                /* 如果加入就绪列表的任务优先级大于当前任务，则进行切换 ，可以提高效率
+                   原因：若没有更高优先级的任务就绪，执行任务切换的时候还是会运行原来的任务，但是多花了一次任务切换的时间*/
+                if(pxTCB->uxPriority >= pxCurrentTCB->uxPriority)
+                {
+                    xSwitchRequired = pdTRUE;
+                }
+#endif /* configUSE_PREEMPTION */
             }
         }
     }
 #endif
+#if ( ( configUSE_PREEMPTION == 1 ) && ( configUSE_TIME_SLICING == 1 ) )
+    {
+        if( listCURRENT_LIST_LENGTH( &( pxReadyTasksLists[ pxCurrentTCB->uxPriority ] ) ) 
+                                     > ( UBaseType_t ) 1 )
+        {
+            xSwitchRequired = pdTRUE;
+        }
+    }
+#endif /* ( ( configUSE_PREEMPTION == 1 ) && ( configUSE_TIME_SLICING == 1 ) ) */
+
     /* 任务切换 */
-    portYIELD();
+    //portYIELD();
+
+    return xSwitchRequired;
 }
 
 static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait)

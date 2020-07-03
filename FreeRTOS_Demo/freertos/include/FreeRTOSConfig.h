@@ -13,6 +13,8 @@
 #define configCPU_CLOCK_HZ                    ((unsigned long)25000000)
 #define configTICK_RATE_HZ                    ((TickType_t)100)
 
+#define configUSE_PREEMPTION                   1
+//#define configUSE_TIME_SLICING                 1
 
 #define xPortPendSVHandler  PendSV_Handler
 #define xPortSysTickHandler SysTick_Handler
