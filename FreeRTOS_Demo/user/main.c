@@ -71,7 +71,18 @@ TCB_t IdleTask_TCB;
 TaskHandle_t IdleTask_Handle;
 StackType_t IdleTask_Stack[configMINIMAL_STACK_SIZE];
 
-
+/*
+ * 打印测试函数
+ * 过多打印会阻塞模拟
+ */
+void print_func(int *rate, const char *func)
+{
+    if(*rate >= 10000)
+    {
+        *rate = 0;
+        //printf("exec %s \n", (func == NULL) ? "..." : func);//一直打印会导致其他线程无法切入
+    }
+}
 /*
  * 软件延时
  * 让 CPU 空等来实现延时，并未放弃 CPU 占有权，即 CPU 还是被占用着
@@ -104,32 +115,35 @@ void Task0_Idle_Entry(void *p_arg)
     }
 }
 
+#define TASK_TIME_SLICING_TEST_ON    1
 /*
  * 任务 1
  */
 void Task1_Entry(void *p_arg)
 {
+    int rate = 0;
 	while(1)
 	{
-#if 0
-        flag_1 = 1;
-        delay(50);
-        flag_1 = 0;
-        delay(50);
-        
-        /* 任务切换（手动），触发 PendSV_Handler，进入 xPortPendSVHandler，内部执行了 vTaskSwitchContext */
-        //taskYIELD();
-#else
-        printf("exec %s \n", __func__);
+        rate++;
+        //print_func(&rate, __func__);
+
+#if TASK_TIME_SLICING_TEST_ON
         int cnt1 = 0;
         while(cnt1 <= 100)
         {
             flag_1 = 1;
-            delay(100);
+            delay(50);
             flag_1 = 0;
-            delay(100);
+            delay(50);
             cnt1++;
         }
+        //vTaskDelay(1);
+        /* 任务切换（手动），触发 PendSV_Handler，进入 xPortPendSVHandler，内部执行了 vTaskSwitchContext */
+        //taskYIELD();
+#else
+        flag_1 = 1;
+        vTaskDelay(1);
+        flag_1 = 0;
         vTaskDelay(1);
 #endif
 	}
@@ -139,18 +153,12 @@ void Task1_Entry(void *p_arg)
  */
 void Task2_Entry(void *p_arg)
 {
+    int rate = 0;
 	while(1)
 	{
-#if 0
-        flag_2 = 1;
-        delay(100);
-        flag_2 = 0;
-        delay(100);		
-        
-        /* 任务切换（手动），触发 PendSV_Handler，进入 xPortPendSVHandler，内部执行了 vTaskSwitchContext */
-        //taskYIELD();
-#else
-        printf("exec %s \n", __func__);
+        rate++;
+        //print_func(&rate, __func__);
+#if TASK_TIME_SLICING_TEST_ON
         int cnt2 = 0;
         while(cnt2 <= 100)
         {
@@ -160,6 +168,13 @@ void Task2_Entry(void *p_arg)
             delay(100);
             cnt2++;
         }
+        //vTaskDelay(1);
+        /* 任务切换（手动），触发 PendSV_Handler，进入 xPortPendSVHandler，内部执行了 vTaskSwitchContext */
+        //taskYIELD();
+#else
+        flag_2 = 1;
+        vTaskDelay(1);
+        flag_2 = 0;
         vTaskDelay(1);
 #endif
 	}
@@ -169,23 +184,27 @@ void Task2_Entry(void *p_arg)
  */
 void Task3_Entry(void *p_arg)
 {
+    int rate = 0;
 	while(1)
 	{
-#if 0
-        flag_3 = 1;
-        delay(100);
-        flag_3 = 0;
-        delay(100);
+        rate++;
+        //print_func(&rate, __func__);
+        /* 观察波形，可以确认任务3先执行 */
+        {
+            flag_3 = 1;
+            delay(2000);
+            flag_3 = 0;
+            delay(2000);
+            flag_3 = 1;
+            delay(2000);
+            flag_3 = 0;
+            delay(2000);
+        }
 
-        /* 任务切换（手动），触发 PendSV_Handler，进入 xPortPendSVHandler，内部执行了 vTaskSwitchContext */
-        taskYIELD();
-#else
-        printf("exec %s \n", __func__);
         flag_3 = 1;
         vTaskDelay(1);
         flag_3 = 0;
         vTaskDelay(1);
-#endif
 	}
 }
 /*
@@ -216,12 +235,16 @@ int main(void)
                                      (StackType_t *)Task1_Stack,
                                      (TCB_t *)(&Task1_TCB));
 
-    /* 优先级与 Task2 相同，测试时间片轮转 */
+    /* 优先级与 Task1 相同，测试时间片轮转 */
     Task2_Handle = xTaskCreateStatic((TaskFunction_t)Task2_Entry,
                                      (char *)"Task2",
                                      (uint32_t)TASK2_STACK_SIZE,
                                      (void *)NULL,
+#if TASK_TIME_SLICING_TEST_ON
                                      1,
+#else
+                                     2,
+#endif
                                      (StackType_t *)Task2_Stack,
                                      (TCB_t *)(&Task2_TCB));
 
