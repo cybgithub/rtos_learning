@@ -57,11 +57,11 @@ typedef struct xLIST
 /* 获取链表的入口节点 */
 #define listGET_HEAD_ENTRY(pxList)                    (((pxList)->xListEnd).pxNext)
 /* 获取链表的第一个节点 */
-#define listGET_NEXT(pxListItem)                      (pxListItem->pxNext)
+#define listGET_NEXT(pxListItem)                      ((pxListItem)->pxNext)
 /* 获取链表的最后一个节点 */
 #define listGET_END_MARKER(pxList)                    ((ListItem_t const *)(&((pxList)->xListEnd)))
 /* 判断链表是否为空 */
-#define listLIST_IS_EMPTY(pxList)                     ((BaseType_t)(((pxList)->uxNumberOfItems) == (UBaseType_t)0)
+#define listLIST_IS_EMPTY(pxList)                     ((BaseType_t)(((pxList)->uxNumberOfItems) == (UBaseType_t)0))
 /* 获取链表节点数 */
 #define listCURRENT_LIST_LENGTH(pxList)               ((pxList)->uxNumberOfItems)
 
@@ -89,7 +89,7 @@ typedef struct xLIST
 */
 void vListInitialise(List_t * const pxList);
 void vListInitialiseItem(ListItem_t * const pxItem);
-void vListInsertEnd(List_t * const pxList, ListItem_t * const pxNewtListItem);
+void vListInsertEnd(List_t * const pxList, ListItem_t * const pxNewListItem);
 void vListInsert(List_t * const pxList, ListItem_t * const pxNewListItem);
 UBaseType_t uxListRemove(ListItem_t * const pxItemToRemove);
 

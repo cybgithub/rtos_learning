@@ -17,6 +17,14 @@ static volatile TickType_t xTickCount              = (TickType_t)0U;
 static volatile UBaseType_t uxTopReadyPriority     = taskIDLE_PRIORITY;
 static UBaseType_t uxTaskNumber                    = (UBaseType_t)0U;
 
+static volatile TickType_t xNextTaskUnblockTime     = (TickType_t)0U;
+static volatile BaseType_t xNumOfOverflows         = (BaseType_t)0;
+
+static List_t xDelayedTaskList1;
+static List_t xDelayedTaskList2;
+static List_t * volatile pxDelayedTaskList;
+static List_t * volatile pxOverflowDelayedTaskList;
+
 /*
 *************************************************************************
 *                               函数声明
@@ -30,6 +38,9 @@ static void prvInitialiseNewTask(TaskFunction_t pxTaskCode,          /* 任务入口
                                  UBaseType_t uxPriority,             /* 任务优先级 */
                                  TaskHandle_t * const pxCreatedTask, /* 创建成功后返回的任务句柄 */
                                  TCB_t *pxNewTCB);
+
+static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait);
+static void prvResetNextTaskUnblockTime(void);
 /*
 *************************************************************************
 *                               宏定义
@@ -109,6 +120,20 @@ static void prvInitialiseNewTask(TaskFunction_t pxTaskCode,          /* 任务入口
 #endif
 
 #endif /* configUSE_PORT_OPTIMISED_TASK_SELECTION */
+
+/*
+ * 当系统时基计数器溢出的时候，延时列表和溢出延时列表要相互切换
+ */
+#define taskSWITCH_DELAYED_LISTS() \
+{ \
+    List_t * pxTemp; \
+    pxTemp = pxDelayedTaskList; \
+    pxDelayedTaskList = pxOverflowDelayedTaskList; \
+    pxOverflowDelayedTaskList = pxTemp; \
+    xNumOfOverflows++; \
+    prvResetNextTaskUnblockTime(); \
+}
+
 
 /*
 *************************************************************************
@@ -212,10 +237,19 @@ static void prvInitialiseNewTask(TaskFunction_t pxTaskCode,          /* 任务入口
 void prvInitialiseTaskLists(void)
 {
     UBaseType_t uxPriority;
+
+    /* 初始化就绪列表 */
     for(uxPriority = (UBaseType_t)0U; uxPriority < (UBaseType_t)configMAX_PRIORITIES; uxPriority++)
     {
         vListInitialise(&(pxReadyTasksLists[uxPriority]));
     }
+
+    /* 初始化延时列表 */
+    vListInitialise(&xDelayedTaskList1);
+    vListInitialise(&xDelayedTaskList2);
+
+    pxDelayedTaskList = &xDelayedTaskList1;
+    pxOverflowDelayedTaskList = &xDelayedTaskList2;
 }
 
 static void prvAddNewTaskToReadyList(TCB_t *pxNewTCB)
@@ -265,6 +299,7 @@ void vTaskStartScheduler(void)
     pxCurrentTCB = &Task1_TCB;
 #endif
 
+    xNextTaskUnblockTime = portMAX_DELAY;
     /* 初始化系统时基计数器 */
     xTickCount = (TickType_t)0U;
 
@@ -358,11 +393,11 @@ void vTaskSwitchContext(void)
  */
 void vTaskDelay(const TickType_t xTicksToDelay)
 {
+#if 0
     TCB_t *pxTCB = NULL;
 
     /* 获取当前任务的 TCB */
     pxTCB = pxCurrentTCB;
-
     /* 设置延时时间 */
     pxTCB->xTicksToDelay = xTicksToDelay;
 
@@ -371,6 +406,10 @@ void vTaskDelay(const TickType_t xTicksToDelay)
 
     /* 根据优先级将优先级位图表 uxTopReadyPriority 中对应的位清零*/
     taskRESET_READY_PRIORITY(pxTCB->uxPriority);
+#else
+    /* 将任务插入到延时列表 */
+    prvAddCurrentTaskToDelayedList(xTicksToDelay);
+#endif
 
     /* 任务切换 */
     taskYIELD();
@@ -378,6 +417,7 @@ void vTaskDelay(const TickType_t xTicksToDelay)
 
 void xTaskIncrementTick(void)
 {
+#if 0
     TCB_t *pxTCB = NULL;
     BaseType_t i = 0;
 
@@ -399,15 +439,113 @@ void xTaskIncrementTick(void)
             }
         }
     }
+#else
+    TCB_t * pxTCB;
+    TickType_t xItemValue; //节点的辅助排序值
 
+    const TickType_t xConstTickCount = xTickCount + 1;
+    xTickCount = xConstTickCount;
+
+    /* 如果 xConstTickCount 溢出，则切换延时列表 */
+    if(xConstTickCount == (TickType_t)0U)
+    {
+        taskSWITCH_DELAYED_LISTS();
+    }
+
+    /* 最近的延时任务的延时到期或超时*/
+    if(xConstTickCount >= xNextTaskUnblockTime)
+    {
+        while(1)
+        {
+            if(listLIST_IS_EMPTY(pxDelayedTaskList) != pdFALSE)
+            {
+                /* 延时列表为空，设置 xNextTaskUnblockTime 为最大值*/
+                xNextTaskUnblockTime = portMAX_DELAY;
+                break ;
+            }
+            else /* 延时列表不为空 */
+            {
+                pxTCB = (TCB_t *)listGET_OWNER_OF_HEAD_ENTRY(pxDelayedTaskList);
+                xItemValue = listGET_LIST_ITEM_VALUE(&(pxTCB->xStateListItem));
+
+                /* 列表中存在任务未到期（从头开始检查，因为 xItemValue 是升序排列的），
+                   更新 xNextTaskUnblockTime 为下一个要到期的任务延时tick数 */
+                if(xConstTickCount < xItemValue)
+                {
+                    xNextTaskUnblockTime = xItemValue;
+                    break ;
+                }
+
+                /* 到期任务从延时列表中清除 */
+                uxListRemove(&(pxTCB->xStateListItem));
+                /* 将解除等待的任务添加到就绪列表 */
+                prvAddTaskToReadyList(pxTCB);
+            }
+        }
+    }
+#endif
     /* 任务切换 */
     portYIELD();
 }
 
+static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait)
+{
+    TickType_t xTimeToWake = (TickType_t)0U;
 
+    /* 获取系统时基计数器的 xTickCount 的值，其中 xTickCount 在不断增加，直至溢出后再继续增加 */
+    const TickType_t xConstTickCount = xTickCount;
+    /* 将任务从就绪列表中删除 */
+    if(uxListRemove(&(pxCurrentTCB->xStateListItem)) == (UBaseType_t)0)
+    {
+        /* 将任务在优先级位图中对应的位清除 */
+        portRESET_READY_PRIORITY(pxCurrentTCB->uxPriority, uxTopReadyPriority);
+    }
 
+    /* 计算延时到期时，系统时基计数器 xTickCount 自增的值变成多少 */
+    xTimeToWake = xConstTickCount + xTicksToWait;
 
+    /* 将节点到期的值设置为节点的排序值，具体参见 ListItem_t 结构体成员定义 */
+    listSET_LIST_ITEM_VALUE(&(pxCurrentTCB->xStateListItem), xTimeToWake);
 
+    /* 溢出 */
+    if(xTimeToWake < xConstTickCount)
+    {
+        vListInsert(pxOverflowDelayedTaskList, &(pxCurrentTCB->xStateListItem));
+    }
+    /* 没有溢出 */
+    else
+    {
+        vListInsert(pxDelayedTaskList, &(pxCurrentTCB->xStateListItem));
+        /* 更新下一个任务解锁时刻变量 xNextTaskUnblockTime 的数值（升序排列） */
+        if(xTimeToWake < xNextTaskUnblockTime)
+        {
+            xNextTaskUnblockTime = xTimeToWake;
+        }
+    }
+}
+
+static void prvResetNextTaskUnblockTime(void)
+{
+    TCB_t *pxTCB;
+
+	if(listLIST_IS_EMPTY(pxDelayedTaskList) != pdFALSE)
+    {
+		/* The new current delayed list is empty.  Set xNextTaskUnblockTime to
+		the maximum possible value so it is	extremely unlikely that the
+		if( xTickCount >= xNextTaskUnblockTime ) test will pass until
+		there is an item in the delayed list. */
+		xNextTaskUnblockTime = portMAX_DELAY;
+	}
+	else
+	{
+		/* The new current delayed list is not empty, get the value of
+		the item at the head of the delayed list.  This is the time at
+		which the task at the head of the delayed list should be removed
+		from the Blocked state. */
+		(pxTCB) = (TCB_t *) listGET_OWNER_OF_HEAD_ENTRY(pxDelayedTaskList);
+		xNextTaskUnblockTime = listGET_LIST_ITEM_VALUE(&((pxTCB)->xStateListItem));
+	}
+}
 
 
 

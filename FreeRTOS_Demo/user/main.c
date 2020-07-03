@@ -78,8 +78,8 @@ void delay(uint32_t count)
 /*
  * 任务0， 空闲任务
  */
-static UBaseType_t idle_cnt = (UBaseType_t)0UL;
-static UBaseType_t print_rate = (UBaseType_t)0xffff;
+//static UBaseType_t idle_cnt = (UBaseType_t)0UL;
+//static UBaseType_t print_rate = (UBaseType_t)0xffff;
 
 void Task0_Idle_Entry(void *p_arg)
 {
@@ -187,6 +187,8 @@ int main(void)
     vListInsertEnd(&(pxReadyTaskLists[1]), &(((TCB_t *)(&Task1_TCB))->xStateListItem));  
     vListInsertEnd(&(pxReadyTaskLists[2]), &(((TCB_t *)(&Task2_TCB))->xStateListItem));  
 #endif
+    /* 启用调度前关闭中断 */
+    portDISABLE_INTERRUPTS();
     /* 启动调度器，开始多任务调度，启动完成不返回 */                                     
     vTaskStartScheduler();
          

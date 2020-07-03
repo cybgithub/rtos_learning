@@ -24,17 +24,17 @@ void vListInitialiseItem(ListItem_t * const pxItem)
 }
 
 /* 节点插入到链表尾部 */
-void vListInsertEnd(List_t * const pxList, ListItem_t * const pxNewtListItem)
+void vListInsertEnd(List_t * const pxList, ListItem_t * const pxNewListItem)
 {
     ListItem_t * const pxIndex = pxList->pxIndex;
-    pxNewtListItem->pxNext = pxIndex;
-    pxNewtListItem->pxPrevious = pxIndex->pxPrevious;
-    pxIndex->pxPrevious->pxNext = pxNewtListItem;
-    pxIndex->pxPrevious = pxNewtListItem;
+    pxNewListItem->pxNext = pxIndex;
+    pxNewListItem->pxPrevious = pxIndex->pxPrevious;
+    pxIndex->pxPrevious->pxNext = pxNewListItem;
+    pxIndex->pxPrevious = pxNewListItem;
     //pxIndex->pxNext 指向不变化
     
     /* 记住该节点所在的链表 */
-    pxNewtListItem->pvContainer = (void *)pxList;
+    pxNewListItem->pvContainer = (void *)pxList;
     
     /* 链表节点计数器++ */
     (pxList->uxNumberOfItems)++;
@@ -88,6 +88,13 @@ UBaseType_t uxListRemove(ListItem_t * const pxItemToRemove)
     List_t * const pxList = pxItemToRemove->pvContainer;
     pxItemToRemove->pxPrevious->pxNext = pxItemToRemove->pxNext;
     pxItemToRemove->pxNext->pxPrevious = pxItemToRemove->pxPrevious;
+
+    /* 调整链表的节点索引指针 */
+    /* 假设删除的就是用来遍历链表的当前节点，则需要给 pxIndex 重新定一个有效的用于遍历的起始位置节点 */
+	if( pxList->pxIndex == pxItemToRemove )
+	{
+		pxList->pxIndex = pxItemToRemove->pxPrevious; // 或者 pxItemToRemove->pxNext 等
+	}
     
     /* 初始化节点所在的链表为空，表示节点还没有插入任何链表 */
     pxItemToRemove->pvContainer = NULL;
