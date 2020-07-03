@@ -111,7 +111,7 @@ void Task1_Entry(void *p_arg)
 {
 	while(1)
 	{
-#if 1
+#if 0
         flag_1 = 1;
         delay(50);
         flag_1 = 0;
@@ -121,10 +121,16 @@ void Task1_Entry(void *p_arg)
         //taskYIELD();
 #else
         printf("exec %s \n", __func__);
-        flag_1 = 1;
-        vTaskDelay(20);
-        flag_1 = 0;
-        vTaskDelay(20);
+        int cnt1 = 0;
+        while(cnt1 <= 100)
+        {
+            flag_1 = 1;
+            delay(100);
+            flag_1 = 0;
+            delay(100);
+            cnt1++;
+        }
+        vTaskDelay(1);
 #endif
 	}
 }
@@ -135,7 +141,7 @@ void Task2_Entry(void *p_arg)
 {
 	while(1)
 	{
-#if 1
+#if 0
         flag_2 = 1;
         delay(100);
         flag_2 = 0;
@@ -145,10 +151,16 @@ void Task2_Entry(void *p_arg)
         //taskYIELD();
 #else
         printf("exec %s \n", __func__);
-        flag_2 = 1;
-        vTaskDelay(20);
-        flag_2 = 0;
-        vTaskDelay(20);
+        int cnt2 = 0;
+        while(cnt2 <= 100)
+        {
+            flag_2 = 1;
+            delay(100);
+            flag_2 = 0;
+            delay(100);
+            cnt2++;
+        }
+        vTaskDelay(1);
 #endif
 	}
 }
