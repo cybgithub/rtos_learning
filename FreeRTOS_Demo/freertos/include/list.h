@@ -20,8 +20,8 @@ struct xLIST_ITEM
 
 typedef struct xLIST_ITEM ListItem_t;
 
-/* mini节点结构体定义，作为双向链表的结尾
-   因为双向链表是首尾相连的，头即是尾，尾即是头 */
+/* mini节点结构体定义，作为链表的根节点
+   双向链表是首尾相连的，根节点既是头也是尾 */
 struct xMIN_LIST_ITEM
 {
     TickType_t xItemValue;          /* 辅助值，用于帮助节点做顺序排列 */
@@ -35,8 +35,10 @@ typedef struct xMIN_LIST_ITEM MiniListItem_t;
 typedef struct xLIST
 {
     UBaseType_t uxNumberOfItems;    /* 链表节点计数器 */
-    ListItem_t *pxIndex;            /* 链表节点索引指针，是链表的最后一个节点 */
-    MiniListItem_t xListEnd;        /* 链表中包含最大xItemValue的节点，位于链表末端，用作标记 marker */ 
+    ListItem_t *pxIndex;            /* 链表节点索引指针，初始化后指向链表的最后一个节点或者说是头部节点，即下面的xListEnd节点，称之为root根节点；
+                                       pxIndex->pxNext是链表中第一个有效节点（或自身，即空链表），pxIndex->pxPrevious是链表中最后一个有效节点（或自身，即空链表）；
+                                       任务调度过程中，节点索引会动态变化，指向不同人物的TCB */
+    MiniListItem_t xListEnd;        /* 链表中包含最大xItemValue的节点，位于链表末端，也可认为是头部，用作标记 marker */
 } List_t;
 
 /*
